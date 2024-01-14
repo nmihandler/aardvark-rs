@@ -1,30 +1,16 @@
 use crate::AardvarkError;
-use crate::AardvarkHandle;
 use embedded_hal::i2c::ErrorType;
 use embedded_hal::i2c::{I2c, Operation as I2cOperation, SevenBitAddress, TenBitAddress};
+use aardvark_ffi::{aa_i2c_read, aa_i2c_write};
 use std::fmt;
 use std::ops::Deref;
 pub struct I2CDevice {
-    handle: AardvarkHandle,
+    handle: Aardvark,
 }
 
 impl I2CDevice {
-    pub fn new(handle: AardvarkHandle) -> Self {
+    pub fn new(handle: Aardvark) -> Self {
         Self { handle }
-    }
-}
-
-impl std::ops::Deref for I2CDevice {
-    type Target = AardvarkHandle;
-
-    fn deref(&self) -> &Self::Target {
-        &self.handle
-    }
-}
-
-impl std::ops::DerefMut for I2CDevice {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.handle
     }
 }
 
@@ -37,14 +23,35 @@ impl I2c<TenBitAddress> for I2CDevice {
         for (_, operation) in operations.iter_mut().enumerate() {
             match operation {
                 I2cOperation::Read(buffer) => {
-                    self.deref()
-                        .aa_i2c_read(address, 0, buffer)
-                        .map_err(|err| I2CError(err))?;
+
+                    let status = aa_i2c_read(
+                        self.handle,
+                        address,
+                        AardvarkI2cFlags_AA_I2C_10_BIT_ADDR,
+                        bytes,
+                        buffer.as_mut_ptr(),
+                    );
+
+                    if status != 0 {
+                        let error = AardvarkError::new(status);
+                        return Err(I2CError(error));
+                    } 
+                    return Ok(());                
                 }
                 I2cOperation::Write(bytes) => {
-                    self.deref()
-                        .aa_i2c_write(address, 0, bytes)
-                        .map_err(|err| I2CError(err))?;
+                    let status = aa_i2c_write(
+                        self.handle,
+                        address,
+                        AardvarkI2cFlags_AA_I2C_10_BIT_ADDR,
+                        bytes,
+                        data_out.as_ptr(),
+                    );
+                
+                    if status != 0 {
+                        let error = AardvarkError::new(status);
+                        return Err(I2CError(error));
+                    } 
+                    return Ok(());                
                 }
             }
         }
